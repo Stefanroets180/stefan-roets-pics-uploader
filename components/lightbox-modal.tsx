@@ -160,7 +160,9 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
       <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/60 dark:from-black/80 to-transparent p-4">
         <div className="flex items-center justify-between text-white">
           <div className="flex items-center gap-4">
+{/*
             <h2 className="text-lg font-semibold truncate max-w-md">{currentPhoto.name}</h2>
+*/}
             <span className="text-sm text-white/70">
               {currentIndex + 1} of {photos.length}
             </span>
