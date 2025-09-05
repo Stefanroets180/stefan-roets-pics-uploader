@@ -34,7 +34,7 @@ export async function convertToAvif(file: File): Promise<Blob> {
           }
         },
         "image/avif",
-        0.8,
+        0.4,
       )
     }
 
@@ -45,7 +45,7 @@ export async function convertToAvif(file: File): Promise<Blob> {
 
 export function validateImageFile(file: File): boolean {
   const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
-  const maxSize = 10 * 1024 * 1024 // 10MB
+  const maxSize = 30 * 3840 * 2160 // 30MB
 
   return validTypes.includes(file.type) && file.size <= maxSize
 }
