@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { Button } from "@/components/ui/button"
 import { Moon, Sun, Upload } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -8,9 +10,10 @@ import { useState, useEffect } from "react"
 interface PhotoGalleryHeaderProps {
   onUploadClick?: () => void
   photoCount?: number
+  extraActions?: React.ReactNode
 }
 
-export function PhotoGalleryHeader({ onUploadClick, photoCount = 0 }: PhotoGalleryHeaderProps) {
+export function PhotoGalleryHeader({ onUploadClick, photoCount = 0, extraActions }: PhotoGalleryHeaderProps) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -38,6 +41,8 @@ export function PhotoGalleryHeader({ onUploadClick, photoCount = 0 }: PhotoGalle
               <Upload className="h-4 w-4" />
               Upload Photos
             </Button>
+
+            {extraActions}
 
             {mounted && (
               <Button variant="ghost" size="sm" onClick={toggleTheme} className="h-9 w-9 p-0">
