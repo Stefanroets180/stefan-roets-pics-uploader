@@ -2,10 +2,13 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client
 
 const s3Client = new S3Client({
     region: process.env.AWS_REGION!,
-    credentials: {
+    credentials: async () => ({
         accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-    },
+    }),
+    // Disable all automatic credential loading
+    maxAttempts: 3,
+    retryMode: "standard",
 })
 
 export interface UploadResult {
