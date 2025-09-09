@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut } from "lucide-react"
+import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, Maximize, Minimize } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Photo {
@@ -30,6 +30,9 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
     const [touchStart, setTouchStart] = useState({ x: 0, y: 0, distance: 0 })
     const [initialZoom, setInitialZoom] = useState(1)
+    const [isFullscreen, setIsFullscreen] = useState(false)
+    const [showControls, setShowControls] = useState(true)
+    const [controlsTimeout, setControlsTimeout] = useState<NodeJS.Timeout | null>(null)
 
     const currentPhoto = photos[currentIndex]
 
@@ -39,6 +42,47 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
         setPosition({ x: 0, y: 0 })
         setImageLoaded(false)
     }, [currentIndex])
+
+    useEffect(() => {
+        if (isFullscreen) {
+            const hideControls = () => {
+                setShowControls(false)
+            }
+
+            const showControlsTemporarily = () => {
+                setShowControls(true)
+                if (controlsTimeout) clearTimeout(controlsTimeout)
+                const timeout = setTimeout(hideControls, 3000)
+                setControlsTimeout(timeout)
+            }
+
+            // Initially show controls for 3 seconds
+            showControlsTemporarily()
+
+            return () => {
+                if (controlsTimeout) clearTimeout(controlsTimeout)
+            }
+        } else {
+            setShowControls(true)
+            if (controlsTimeout) clearTimeout(controlsTimeout)
+        }
+    }, [isFullscreen])
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (isFullscreen) {
+            setShowControls(true)
+            if (controlsTimeout) clearTimeout(controlsTimeout)
+            const timeout = setTimeout(() => setShowControls(false), 3000)
+            setControlsTimeout(timeout)
+        }
+
+        if (isDragging && zoom > 1) {
+            setPosition({
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y,
+            })
+        }
+    }
 
     // Keyboard navigation
     const handleKeyDown = useCallback(
@@ -70,9 +114,14 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
                     e.preventDefault()
                     resetZoom()
                     break
+                case "f":
+                case "F":
+                    e.preventDefault()
+                    setIsFullscreen(!isFullscreen)
+                    break
             }
         },
-        [isOpen, currentIndex],
+        [isOpen, currentIndex, isFullscreen],
     )
 
     useEffect(() => {
@@ -118,15 +167,6 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
             setDragStart({
                 x: e.clientX - position.x,
                 y: e.clientY - position.y,
-            })
-        }
-    }
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (isDragging && zoom > 1) {
-            setPosition({
-                x: e.clientX - dragStart.x,
-                y: e.clientY - dragStart.y,
             })
         }
     }
@@ -187,6 +227,13 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
     const handleTouchMove = (e: React.TouchEvent) => {
         e.preventDefault()
 
+        if (isFullscreen) {
+            setShowControls(true)
+            if (controlsTimeout) clearTimeout(controlsTimeout)
+            const timeout = setTimeout(() => setShowControls(false), 3000)
+            setControlsTimeout(timeout)
+        }
+
         if (e.touches.length === 1 && isDragging && zoom > 1) {
             // Single touch drag
             setPosition({
@@ -229,70 +276,93 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
     if (!isOpen || !currentPhoto) return null
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/95 dark:bg-black/98 backdrop-blur-sm">
-            {/* Header */}
-            <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/60 dark:from-black/80 to-transparent p-2 sm:p-4 safe-area-inset-top">
-                <div className="flex items-center justify-between text-white">
-                    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <span className="text-xs sm:text-sm text-white/70 whitespace-nowrap">
-              {currentIndex + 1} of {photos.length}
-            </span>
-                    </div>
+        <div className="fixed inset-0 z-50 bg-black/95 dark:bg-black/98 backdrop-blur-sm" onMouseMove={handleMouseMove}>
+            {/* Header - Hide in fullscreen mode or when controls are hidden */}
+            {(!isFullscreen || showControls) && (
+                <div
+                    className={cn(
+                        "absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/60 dark:from-black/80 to-transparent p-2 sm:p-4 safe-area-inset-top transition-opacity duration-300",
+                        isFullscreen && !showControls && "opacity-0 pointer-events-none",
+                    )}
+                >
+                    <div className="flex items-center justify-between text-white">
+                        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+              <span className="text-xs sm:text-sm text-white/70 whitespace-nowrap">
+                {currentIndex + 1} of {photos.length}
+              </span>
+                        </div>
 
-                    <div className="flex items-center gap-1 sm:gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleZoomOut}
-                            disabled={zoom <= 0.5}
-                            className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
-                        >
-                            <ZoomOut className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleZoomOut}
+                                disabled={zoom <= 0.5}
+                                className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
+                            >
+                                <ZoomOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={resetZoom}
-                            className="text-white hover:bg-white/20 dark:hover:bg-white/30 text-xs px-1 sm:px-2 h-8 sm:h-10 min-w-[2rem] sm:min-w-[2.5rem]"
-                        >
-                            {Math.round(zoom * 100)}%
-                        </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={resetZoom}
+                                className="text-white hover:bg-white/20 dark:hover:bg-white/30 text-xs px-1 sm:px-2 h-8 sm:h-10 min-w-[2rem] sm:min-w-[2.5rem]"
+                            >
+                                {Math.round(zoom * 100)}%
+                            </Button>
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleZoomIn}
-                            disabled={zoom >= 3}
-                            className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
-                        >
-                            <ZoomIn className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleZoomIn}
+                                disabled={zoom >= 3}
+                                className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
+                            >
+                                <ZoomIn className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleDownload}
-                            className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
-                        >
-                            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleDownload}
+                                className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
+                            >
+                                <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
 
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onClose}
-                            className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
-                        >
-                            <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsFullscreen(!isFullscreen)}
+                                className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
+                            >
+                                {isFullscreen ? (
+                                    <Minimize className="h-3 w-3 sm:h-4 sm:w-4" />
+                                ) : (
+                                    <Maximize className="h-3 w-3 sm:h-4 sm:w-4" />
+                                )}
+                            </Button>
+
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={onClose}
+                                className="text-white hover:bg-white/20 dark:hover:bg-white/30 h-8 w-8 sm:h-10 sm:w-10 p-0"
+                            >
+                                <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Main image area */}
+            {/* Main image area - Remove padding in fullscreen mode */}
             <div
-                className="absolute inset-0 flex items-center justify-center p-2 sm:p-4 pt-12 sm:pt-20 pb-12 sm:pb-16 safe-area-inset"
+                className={cn(
+                    "absolute inset-0 flex items-center justify-center safe-area-inset",
+                    isFullscreen ? "p-0" : "p-2 sm:p-4 pt-12 sm:pt-20 pb-12 sm:pb-16",
+                )}
                 onClick={(e) => e.target === e.currentTarget && onClose()}
             >
                 <div
@@ -305,7 +375,6 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
                         transform: `scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
                     }}
                     onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                     onTouchStart={handleTouchStart}
@@ -332,14 +401,17 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
                 </div>
             </div>
 
-            {/* Navigation buttons */}
-            {photos.length > 1 && (
+            {/* Navigation buttons - Hide in fullscreen mode or when controls are hidden */}
+            {photos.length > 1 && (!isFullscreen || showControls) && (
                 <>
                     <Button
                         variant="ghost"
                         size="lg"
                         onClick={navigateToPrevious}
-                        className="absolute left-1 sm:left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 dark:hover:bg-white/30 h-10 w-10 sm:h-12 sm:w-12 rounded-full"
+                        className={cn(
+                            "absolute left-1 sm:left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 dark:hover:bg-white/30 h-10 w-10 sm:h-12 sm:w-12 rounded-full transition-opacity duration-300",
+                            isFullscreen && !showControls && "opacity-0 pointer-events-none",
+                        )}
                     >
                         <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
                     </Button>
@@ -348,37 +420,47 @@ export function LightboxModal({ photos, currentIndex, isOpen, onClose, onNavigat
                         variant="ghost"
                         size="lg"
                         onClick={navigateToNext}
-                        className="absolute right-1 sm:right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 dark:hover:bg-white/30 h-10 w-10 sm:h-12 sm:w-12 rounded-full"
+                        className={cn(
+                            "absolute right-1 sm:right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 dark:hover:bg-white/30 h-10 w-10 sm:h-12 sm:w-12 rounded-full transition-opacity duration-300",
+                            isFullscreen && !showControls && "opacity-0 pointer-events-none",
+                        )}
                     >
                         <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
                     </Button>
                 </>
             )}
 
-            {/* Bottom info */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 dark:from-black/80 to-transparent p-2 sm:p-4 safe-area-inset-bottom">
-                <div className="flex items-center justify-center">
-                    <div className="flex gap-1 sm:gap-2 max-w-full overflow-x-auto">
-                        {photos.map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={() => onNavigate?.(index)}
-                                className={cn(
-                                    "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all flex-shrink-0",
-                                    index === currentIndex ? "bg-white" : "bg-white/40 hover:bg-white/60",
-                                )}
-                            />
-                        ))}
+            {/* Bottom info - Hide in fullscreen mode or when controls are hidden */}
+            {(!isFullscreen || showControls) && (
+                <div
+                    className={cn(
+                        "absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 dark:from-black/80 to-transparent p-2 sm:p-4 safe-area-inset-bottom transition-opacity duration-300",
+                        isFullscreen && !showControls && "opacity-0 pointer-events-none",
+                    )}
+                >
+                    <div className="flex items-center justify-center">
+                        <div className="flex gap-1 sm:gap-2 max-w-full overflow-x-auto">
+                            {photos.map((_, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => onNavigate?.(index)}
+                                    className={cn(
+                                        "w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all flex-shrink-0",
+                                        index === currentIndex ? "bg-white" : "bg-white/40 hover:bg-white/60",
+                                    )}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="text-center text-white/70 text-xs sm:text-sm mt-1 sm:mt-2">
+            <span className="hidden sm:inline">
+              Use arrow keys to navigate • ESC to close • F for fullscreen • Click to zoom • +/- to zoom in/out
+            </span>
+                        <span className="sm:hidden">Swipe to navigate • Pinch to zoom • Tap for fullscreen</span>
                     </div>
                 </div>
-
-                <div className="text-center text-white/70 text-xs sm:text-sm mt-1 sm:mt-2">
-          <span className="hidden sm:inline">
-            Use arrow keys to navigate • ESC to close • Click to zoom • +/- to zoom in/out
-          </span>
-                    <span className="sm:hidden">Swipe to navigate • Pinch to zoom</span>
-                </div>
-            </div>
+            )}
         </div>
     )
 }
